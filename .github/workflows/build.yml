@@ -1,0 +1,65 @@
+name: Build Termius APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: termius-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: branding
+      - name: Checkout pinned Termux source
+        uses: actions/checkout@v4
+        with:
+          repository: termux/termux-app
+          ref: 5b657c6adf4304e5198951ce815fe0205dcac29c
+          path: source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android toolchain
+        run: sdkmanager "platforms;android-30" "build-tools;30.0.3" "ndk;22.1.7171670"
+      - name: Apply Termius branding
+        run: python3 branding/scripts/brand.py source
+      - name: Test terminal and build APKs
+        working-directory: source
+        env:
+          TERMUX_APP_VERSION_NAME: 0.118.3+termius.1
+          TERMUX_APK_VERSION_TAG: termius
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :terminal-emulator:testDebugUnitTest :app:assembleDebug
+      - name: Verify and package APKs
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for abi in universal arm64-v8a armeabi-v7a x86 x86_64; do
+            apk="source/app/build/outputs/apk/debug/termux-app_termius_${abi}.apk"
+            test -s "$apk"
+            "$ANDROID_HOME/build-tools/30.0.3/apksigner" verify "$apk"
+            "$ANDROID_HOME/build-tools/30.0.3/aapt" dump badging "$apk" | grep -F "application-label:'Termius'"
+            cp "$apk" "dist/Termius-${abi}.apk"
+          done
+          cp branding/README.md dist/INSTALL.md
+          tar --exclude=.git --exclude=.gradle --exclude=build --exclude='bootstrap-*.zip' -czf dist/Termius-source.tar.gz -C source .
+          (cd dist && sha256sum *.apk Termius-source.tar.gz > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Termius-APK
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build summary
+        run: |
+          echo '### Termius APK ready ⚡' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Download Termius-APK below, extract it, and install Termius-universal.apk. Read INSTALL.md first.' >> "$GITHUB_STEP_SUMMARY"
