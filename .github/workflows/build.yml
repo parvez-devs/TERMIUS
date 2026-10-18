@@ -41,7 +41,7 @@ jobs:
       - name: Test terminal and build APKs
         working-directory: source
         env:
-          TERMUX_APP_VERSION_NAME: 0.118.3+termius.1
+          TERMUX_APP_VERSION_NAME: 0.118.3+termius.2
           TERMUX_APK_VERSION_TAG: termius
         run: |
           chmod +x gradlew
@@ -58,6 +58,7 @@ jobs:
             cp "$apk" "dist/Termius-${abi}.apk"
           done
           cp branding/README.md dist/INSTALL.md
+          cp branding/upgrade/README.md dist/UPGRADE.md
           tar --exclude=.git --exclude=.gradle --exclude=build --exclude='bootstrap-*.zip' -czf dist/Termius-source.tar.gz -C source .
           (cd dist && sha256sum *.apk Termius-source.tar.gz > SHA256SUMS)
       - uses: actions/upload-artifact@v4

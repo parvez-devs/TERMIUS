@@ -37,3 +37,22 @@ vector = '''<vector xmlns:android="http://schemas.android.com/apk/res/android"
 for name in ("ic_launcher.xml", "ic_launcher_round.xml"):
     (icons / name).write_text(vector)
 print(f"Termius branding applied to {changed} resource files")
+
+# Install the upgrade payload into Android assets and initialize it before properties load.
+import shutil
+payload = Path(__file__).resolve().parent.parent / "upgrade"
+assets = root / "app/src/main/assets/termius"
+assets.mkdir(parents=True, exist_ok=True)
+for name in ("menu.sh", "termius-shell.sh", "colors.properties", "termux.properties"):
+    shutil.copyfile(payload / name, assets / name)
+java = root / "app/src/main/java/com/termux/app"
+shutil.copyfile(payload / "TermiusDefaults.java", java / "TermiusDefaults.java")
+activity = java / "TermuxActivity.java"
+text = activity.read_text()
+anchor = "        mProperties = new TermuxAppSharedProperties(this);"
+assert text.count(anchor) == 1, "Unexpected properties initialization"
+activity.write_text(text.replace(anchor, "        TermiusDefaults.install(this);\n" + anchor))
+build = gradle.read_text()
+assert "versionCode 1002" in build
+gradle.write_text(build.replace("versionCode 1002", "versionCode 1003"))
+print("Termius v2 controls and defaults installed")
