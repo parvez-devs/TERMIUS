@@ -22,6 +22,10 @@ jobs:
           repository: termux/termux-app
           ref: 5b657c6adf4304e5198951ce815fe0205dcac29c
           path: source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: android-actions/setup-android@v3
       - name: Install Android toolchain
         run: sdkmanager "platforms;android-30" "build-tools;30.0.3" "ndk;22.1.7171670"
